@@ -7,16 +7,19 @@ import android.app.NotificationManager;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.Settings;
 import android.text.InputType;
+import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
@@ -36,6 +39,11 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 public final class SocialActivity extends Activity {
+    private static final int INK = 0xff182544;
+    private static final int MUTED = 0xff53627c;
+    private static final int ACCENT = 0xff2948bb;
+    private static final int TINT = 0xffedf1fc;
+    private static final int BORDER = 0xffd9e1f0;
     private interface Request { JSONObject run() throws Exception; }
     private interface Success { void accept(JSONObject data) throws Exception; }
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
@@ -77,13 +85,25 @@ public final class SocialActivity extends Activity {
             });
         }
         setContentView(scroll);
-        label(root, "Tiempo en Pantalla", 15);
-        label(root, "Cuenta y amigos", 30);
+        label(root, "TIEMPO EN PANTALLA", 13).setTextColor(ACCENT);
+        label(root, "Cuenta y amigos", 30).setTypeface(null, Typeface.BOLD);
         LinearLayout account = card(root);
+        account.setBackground(surface(0xff1b2b59, 20, Color.TRANSPARENT));
         accountState = label(account, "", 14);
-        accountName = label(account, "", 22);
+        accountState.setTextColor(0xffcad9ff);
+        accountName = label(account, "", 25);
+        accountName.setTextColor(Color.WHITE);
         accountName.setTypeface(null, Typeface.BOLD);
         status = label(root, "", 15);
+        status.setTextColor(ACCENT);
+        status.setVisibility(View.GONE);
+        status.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence value, int start, int count, int after) {}
+            @Override public void onTextChanged(CharSequence value, int start, int before, int count) {
+                status.setVisibility(value.length() == 0 ? View.GONE : View.VISIBLE);
+            }
+            @Override public void afterTextChanged(android.text.Editable value) {}
+        });
         status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         content = column();
         root.addView(content);
@@ -167,6 +187,8 @@ public final class SocialActivity extends Activity {
         LinearLayout form = card(content);
         RadioGroup modes = new RadioGroup(this);
         modes.setOrientation(LinearLayout.HORIZONTAL);
+        modes.setBackground(surface(TINT, 14, Color.TRANSPARENT));
+        modes.setPadding(dp(4), dp(4), dp(4), dp(4));
         RadioButton signIn = mode(modes, "Iniciar sesión");
         RadioButton register = mode(modes, "Crear cuenta");
         form.addView(modes);
@@ -174,20 +196,19 @@ public final class SocialActivity extends Activity {
         TextView title = label(form, "", 22);
         title.setTypeface(null, Typeface.BOLD);
         TextView help = label(form, "", 15);
-        label(form, "Usuario", 15);
-        EditText name = field(form, "Tu nombre de usuario", InputType.TYPE_CLASS_TEXT);
-        label(form, "Contraseña", 15);
+        help.setTextColor(MUTED);
+        EditText name = field(form, "Usuario", "Tu nombre de usuario", InputType.TYPE_CLASS_TEXT);
         int passwordType = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD;
-        EditText pass = field(form, "Tu contraseña", passwordType);
+        EditText pass = field(form, "Contraseña", "Tu contraseña", passwordType);
         LinearLayout confirmRow = column();
         form.addView(confirmRow);
-        label(confirmRow, "Confirma tu contraseña", 15);
-        EditText confirm = field(confirmRow, "Repite tu contraseña", passwordType);
+        EditText confirm = field(confirmRow, "Confirma tu contraseña", "Repite tu contraseña", passwordType);
 
         EditText server = new EditText(this);
         server.setSingleLine(true);
         server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
         server.setHint("Dirección HTTPS del servidor");
+        styleField(server);
         server.setText(prefs.getString("server", "https://appscontrolsss.netlify.app"));
         server.setVisibility(View.GONE);
 
@@ -213,7 +234,7 @@ public final class SocialActivity extends Activity {
             }
             authenticate(server, name, pass, create);
         });
-        submit.setTypeface(null, Typeface.BOLD);
+        primary(submit);
         form.addView(server);
         button(form, "Configuración del servidor", () ->
                 server.setVisibility(server.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
@@ -257,10 +278,12 @@ public final class SocialActivity extends Activity {
         content.removeAllViews();
         boolean admin = prefs.getBoolean("admin", false);
         showAccount(true);
-        label(content, "Compartir con amigos", 22);
-        label(content, "Al compartir, todos tus amigos aceptados podrán ver tu tiempo de pantalla y el historial por aplicación.", 15);
-        sharingButton = button(content, "", this::toggleSharing);
-        button(content, "Ocultar mis estadísticas compartidas", () -> new AlertDialog.Builder(this)
+        LinearLayout share = card(content);
+        label(share, "Compartir con amigos", 21).setTypeface(null, Typeface.BOLD);
+        label(share, "Al compartir, todos tus amigos aceptados podrán ver tu tiempo de pantalla y el historial por aplicación.", 15);
+        sharingButton = button(share, "", this::toggleSharing);
+        primary(sharingButton);
+        button(share, "Ocultar mis estadísticas compartidas", () -> new AlertDialog.Builder(this)
                 .setMessage("Se detendrá la transmisión y se retirará la copia de tus estadísticas del servidor.")
                 .setNegativeButton("Cancelar", null).setPositiveButton("Ocultar", (dialog, which) -> {
                     stopService(new Intent(this, SharingService.class));
@@ -269,9 +292,9 @@ public final class SocialActivity extends Activity {
                         updateSharingButton();
                     });
                 }).show());
-        button(content, "Generar mi código", () -> run(true,
+        button(share, "Generar mi código", () -> run(true,
                 () -> SocialApi.request(this, "/code", new JSONObject()), response -> showCode(response.getString("code"))));
-        button(content, "Agregar amigo con código", this::addFriend);
+        button(share, "Agregar amigo con código", this::addFriend);
         if (admin) button(content, "Administrar usuarios", this::admin);
         button(content, "Cerrar sesión", () -> {
             stopService(new Intent(this, SharingService.class));
@@ -280,9 +303,10 @@ public final class SocialActivity extends Activity {
                 login();
             });
         });
-        label(content, "Mis amigos", 23);
+        LinearLayout friends = card(content);
+        label(friends, "Mis amigos", 21).setTypeface(null, Typeface.BOLD);
         results = column();
-        content.addView(results);
+        friends.addView(results);
         refresh();
     }
 
@@ -481,14 +505,26 @@ public final class SocialActivity extends Activity {
         return layout;
     }
 
+    private GradientDrawable surface(int fill, int radius, int stroke) {
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(fill);
+        background.setCornerRadius(dp(radius));
+        background.setStroke(dp(1), stroke);
+        return background;
+    }
+
+    private RippleDrawable touchSurface(int fill, int radius, int stroke) {
+        return new RippleDrawable(ColorStateList.valueOf(0x282948bb),
+                surface(fill, radius, stroke), null);
+    }
+
     private LinearLayout card(LinearLayout parent) {
         LinearLayout card = column();
-        GradientDrawable background = new GradientDrawable();
-        background.setColor(Color.WHITE);
-        background.setCornerRadius(dp(14));
-        card.setBackground(background);
-        card.setPadding(dp(12), dp(8), dp(12), dp(8));
-        parent.addView(card);
+        card.setBackground(surface(Color.WHITE, 20, BORDER));
+        card.setPadding(dp(16), dp(12), dp(16), dp(12));
+        LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(-1, -2);
+        layout.topMargin = dp(10);
+        parent.addView(card, layout);
         return card;
     }
 
@@ -496,36 +532,76 @@ public final class SocialActivity extends Activity {
         RadioButton button = new RadioButton(this);
         button.setId(View.generateViewId());
         button.setText(text);
-        parent.addView(button, new RadioGroup.LayoutParams(0, dp(48), 1));
+        button.setTextSize(14);
+        button.setTypeface(null, Typeface.BOLD);
+        button.setGravity(Gravity.CENTER);
+        button.setMinHeight(dp(48));
+        button.setPadding(dp(4), dp(8), dp(4), dp(8));
+        button.setButtonDrawable((android.graphics.drawable.Drawable) null);
+        android.graphics.drawable.StateListDrawable background = new android.graphics.drawable.StateListDrawable();
+        background.addState(new int[]{android.R.attr.state_checked}, touchSurface(Color.WHITE, 11, BORDER));
+        background.addState(new int[]{}, touchSurface(TINT, 11, Color.TRANSPARENT));
+        button.setBackground(background);
+        button.setTextColor(new ColorStateList(
+                new int[][]{{android.R.attr.state_checked}, {}}, new int[]{ACCENT, MUTED}));
+        parent.addView(button, new RadioGroup.LayoutParams(0, -2, 1));
         return button;
     }
 
     private TextView label(LinearLayout parent, String value, int size) {
         TextView label = new TextView(this);
         label.setText(value);
-        label.setTextColor(0xff162040);
+        label.setTextColor(INK);
         label.setTextSize(size);
         label.setPadding(dp(4), dp(6), dp(4), dp(6));
         parent.addView(label);
         return label;
     }
 
-    private EditText field(LinearLayout parent, String hint, int type) {
+    private EditText field(LinearLayout parent, String title, String hint, int type) {
+        TextView caption = label(parent, title, 14);
+        caption.setTypeface(null, Typeface.BOLD);
         EditText field = new EditText(this);
+        field.setId(View.generateViewId());
+        caption.setLabelFor(field.getId());
         field.setSingleLine();
         field.setInputType(type);
         field.setHint(hint);
+        styleField(field);
         parent.addView(field);
         return field;
+    }
+
+    private void styleField(EditText field) {
+        field.setTextSize(16);
+        field.setTextColor(INK);
+        field.setHintTextColor(MUTED);
+        field.setMinHeight(dp(52));
+        field.setPadding(dp(13), dp(10), dp(13), dp(10));
+        android.graphics.drawable.StateListDrawable background = new android.graphics.drawable.StateListDrawable();
+        background.addState(new int[]{android.R.attr.state_focused}, surface(Color.WHITE, 12, ACCENT));
+        background.addState(new int[]{}, surface(0xfff7f9fe, 12, BORDER));
+        field.setBackground(background);
+    }
+
+    private void primary(Button button) {
+        button.setBackground(touchSurface(ACCENT, 12, Color.TRANSPARENT));
+        button.setTextColor(Color.WHITE);
+        button.setTypeface(null, Typeface.BOLD);
     }
 
     private Button button(LinearLayout parent, String title, Runnable action) {
         Button button = new Button(this);
         button.setAllCaps(false);
-        button.setTextColor(Color.rgb(40, 70, 187));
+        button.setTextColor(ACCENT);
+        button.setMinHeight(dp(48));
+        button.setPadding(dp(10), dp(8), dp(10), dp(8));
+        button.setBackground(touchSurface(TINT, 12, Color.TRANSPARENT));
         button.setText(title);
         button.setOnClickListener(view -> action.run());
-        parent.addView(button);
+        LinearLayout.LayoutParams layout = new LinearLayout.LayoutParams(-1, -2);
+        layout.topMargin = dp(8);
+        parent.addView(button, layout);
         return button;
     }
 }
