@@ -10,6 +10,8 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -20,6 +22,8 @@ import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import java.util.ArrayList;
@@ -39,6 +43,7 @@ public final class SocialActivity extends Activity {
     private SharedPreferences prefs;
     private LinearLayout root, content, results;
     private TextView status;
+    private TextView accountState, accountName;
     private Button sharingButton;
     private long friendId;
     private String friendName = "";
@@ -74,6 +79,10 @@ public final class SocialActivity extends Activity {
         setContentView(scroll);
         label(root, "Tiempo en Pantalla", 15);
         label(root, "Cuenta y amigos", 30);
+        LinearLayout account = card(root);
+        accountState = label(account, "", 14);
+        accountName = label(account, "", 22);
+        accountName.setTypeface(null, Typeface.BOLD);
         status = label(root, "", 15);
         status.setAccessibilityLiveRegion(View.ACCESSIBILITY_LIVE_REGION_POLITE);
         content = column();
@@ -143,17 +152,84 @@ public final class SocialActivity extends Activity {
         } else status.setText("No se pudo conectar. Revisa la dirección HTTPS o tu conexión.");
     }
 
+    private void showAccount(boolean signedIn) {
+        boolean admin = prefs.getBoolean("admin", false);
+        accountState.setText(signedIn && admin ? "Sesión activa · Administrador"
+                : signedIn ? "Sesión activa" : "Sin sesión activa");
+        accountName.setText(signedIn ? "@" + prefs.getString("name", "") : "Tu cuenta");
+    }
+
     private void login() {
         screen = 0;
         content.removeAllViews();
-        label(content, "Usa un usuario y una contraseña.", 17);
-        EditText server = field(content, "Dirección HTTPS del servidor", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        showAccount(false);
+
+        LinearLayout form = card(content);
+        RadioGroup modes = new RadioGroup(this);
+        modes.setOrientation(LinearLayout.HORIZONTAL);
+        RadioButton signIn = mode(modes, "Iniciar sesión");
+        RadioButton register = mode(modes, "Crear cuenta");
+        form.addView(modes);
+
+        TextView title = label(form, "", 22);
+        title.setTypeface(null, Typeface.BOLD);
+        TextView help = label(form, "", 15);
+        label(form, "Usuario", 15);
+        EditText name = field(form, "Tu nombre de usuario", InputType.TYPE_CLASS_TEXT);
+        label(form, "Contraseña", 15);
+        int passwordType = InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD;
+        EditText pass = field(form, "Tu contraseña", passwordType);
+        LinearLayout confirmRow = column();
+        form.addView(confirmRow);
+        label(confirmRow, "Confirma tu contraseña", 15);
+        EditText confirm = field(confirmRow, "Repite tu contraseña", passwordType);
+
+        EditText server = new EditText(this);
+        server.setSingleLine(true);
+        server.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        server.setHint("Dirección HTTPS del servidor");
         server.setText(prefs.getString("server", "https://appscontrolsss.netlify.app"));
-        EditText name = field(content, "Usuario", InputType.TYPE_CLASS_TEXT);
-        EditText pass = field(content, "Contraseña", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
-        Runnable signIn = () -> authenticate(server, name, pass, false);
-        button(content, "Iniciar sesión", signIn);
-        button(content, "Crear cuenta", () -> authenticate(server, name, pass, true));
+        server.setVisibility(View.GONE);
+
+        Button submit = button(form, "", () -> {
+            if (pending) return;
+            boolean create = register.isChecked();
+            String username = name.getText().toString().trim();
+            String password = pass.getText().toString();
+            if (username.isEmpty() || password.isEmpty()) {
+                status.setText("Escribe tu usuario y contraseña.");
+                return;
+            }
+            if (create && (!username.matches("[a-zA-Z0-9_]{3,24}")
+                    || password.length() < 8 || password.length() > 128)) {
+                status.setText("Usa de 3 a 24 letras, números o guiones bajos en el usuario "
+                        + "y de 8 a 128 caracteres en la contraseña.");
+                return;
+            }
+            if (create && !password.contentEquals(confirm.getText())) {
+                status.setText("Las contraseñas no coinciden.");
+                confirm.requestFocus();
+                return;
+            }
+            authenticate(server, name, pass, create);
+        });
+        submit.setTypeface(null, Typeface.BOLD);
+        form.addView(server);
+        button(form, "Configuración del servidor", () ->
+                server.setVisibility(server.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE));
+
+        modes.setOnCheckedChangeListener((group, id) -> {
+            boolean create = id == register.getId();
+            title.setText(create ? "Crea tu cuenta" : "Accede a tu cuenta");
+            help.setText(create ? "Elige un usuario y una contraseña. No necesitas correo."
+                    : "Usa el usuario y la contraseña de tu cuenta.");
+            confirmRow.setVisibility(create ? View.VISIBLE : View.GONE);
+            pass.setText("");
+            confirm.setText("");
+            submit.setText(create ? "Crear mi cuenta" : "Entrar");
+            if (!pending) status.setText("");
+        });
+        modes.check(signIn.getId());
     }
 
     private void authenticate(EditText server, EditText name, EditText pass, boolean create) {
@@ -180,7 +256,8 @@ public final class SocialActivity extends Activity {
         friendId = 0;
         content.removeAllViews();
         boolean admin = prefs.getBoolean("admin", false);
-        label(content, "@" + prefs.getString("name", "") + (admin ? "  ·  Administrador" : ""), 21);
+        showAccount(true);
+        label(content, "Compartir con amigos", 22);
         label(content, "Al compartir, todos tus amigos aceptados podrán ver tu tiempo de pantalla y el historial por aplicación.", 15);
         sharingButton = button(content, "", this::toggleSharing);
         button(content, "Ocultar mis estadísticas compartidas", () -> new AlertDialog.Builder(this)
@@ -402,6 +479,25 @@ public final class SocialActivity extends Activity {
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
         return layout;
+    }
+
+    private LinearLayout card(LinearLayout parent) {
+        LinearLayout card = column();
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.WHITE);
+        background.setCornerRadius(dp(14));
+        card.setBackground(background);
+        card.setPadding(dp(12), dp(8), dp(12), dp(8));
+        parent.addView(card);
+        return card;
+    }
+
+    private RadioButton mode(RadioGroup parent, String text) {
+        RadioButton button = new RadioButton(this);
+        button.setId(View.generateViewId());
+        button.setText(text);
+        parent.addView(button, new RadioGroup.LayoutParams(0, dp(48), 1));
+        return button;
     }
 
     private TextView label(LinearLayout parent, String value, int size) {
