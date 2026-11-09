@@ -1,0 +1,47 @@
+name: APK Android
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'android/**'
+      - '.github/workflows/android.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Compilar y firmar APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+          sdk="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          tools="$sdk/build-tools/35.0.0"
+          platform="$sdk/platforms/android-35/android.jar"
+          work="$RUNNER_TEMP/apk-build"
+          mkdir -p "$work/classes" "$work/dex" dist
+          mapfile -t sources < <(find android/src -name '*.java')
+          javac --release 8 -cp "$platform" -d "$work/classes" "${sources[@]}"
+          jar --create --file "$work/classes.jar" -C "$work/classes" .
+          "$tools/d8" --release --min-api 29 --lib "$platform" --output "$work/dex" "$work/classes.jar"
+          "$tools/aapt2" compile --dir android/res -o "$work/res.zip"
+          "$tools/aapt2" link -I "$platform" --manifest android/AndroidManifest.xml -o "$work/unsigned.apk" "$work/res.zip"
+          (cd "$work/dex" && zip -q -0 "$work/unsigned.apk" classes.dex)
+          "$tools/zipalign" -f 4 "$work/unsigned.apk" "$work/aligned.apk"
+          keytool -genkeypair -keystore "$work/debug.p12" -storepass android -alias pantalla -keyalg RSA -keysize 2048 -validity 10000 -dname 'CN=Tiempo en Pantalla CI'
+          "$tools/apksigner" sign --v4-signing-enabled false --ks "$work/debug.p12" --ks-pass pass:android --out dist/Tiempo_en_Pantalla.apk "$work/aligned.apk"
+          "$tools/apksigner" verify dist/Tiempo_en_Pantalla.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Tiempo-en-Pantalla-APK
+          path: dist/Tiempo_en_Pantalla.apk
+          if-no-files-found: error

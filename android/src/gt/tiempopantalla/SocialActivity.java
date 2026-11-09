@@ -148,7 +148,7 @@ public final class SocialActivity extends Activity {
         content.removeAllViews();
         label(content, "Usa un usuario y una contraseña.", 17);
         EditText server = field(content, "Dirección HTTPS del servidor", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        server.setText(prefs.getString("server", ""));
+        server.setText(prefs.getString("server", "https://appscontrolsss.netlify.app"));
         EditText name = field(content, "Usuario", InputType.TYPE_CLASS_TEXT);
         EditText pass = field(content, "Contraseña", InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         Runnable signIn = () -> authenticate(server, name, pass, false);

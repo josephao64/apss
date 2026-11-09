@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import pg from "pg";
 import { hashPassword, hashToken, validName, validPassword } from "../security.mjs";
@@ -9,6 +10,7 @@ export const config = {
 };
 
 let pool;
+let schemaReady;
 const fail = (status, message) => { throw Object.assign(new Error(message), { status }); };
 const json = (data, status = 200) => Response.json(data, {
   status, headers: { "Cache-Control": "no-store" }
@@ -70,6 +72,18 @@ async function transaction(action) {
   } finally {
     db.release();
   }
+}
+
+async function prepareSchema() {
+  const { rows: [state] } = await pool.query(
+    "SELECT to_regclass('users') IS NOT NULL AS initialized");
+  if (state.initialized) return;
+
+  const schema = await readFile("netlify/schema.sql", "utf8");
+  await transaction(async db => {
+    await db.query("SELECT pg_advisory_xact_lock(209392207)");
+    await db.query(schema);
+  });
 }
 
 async function authenticate(req, ctx, route, now) {
@@ -214,9 +228,14 @@ export default async (req, ctx) => {
   try {
     if (!process.env.DATABASE_URL) fail(503, "Configura la base de datos del servidor.");
     if (!pool) {
-      pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2, connectionTimeoutMillis: 4000 });
+      pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 2, connectionTimeoutMillis: 6000, enableChannelBinding: true });
       pool.on("error", error => console.error("Conexión inactiva de PostgreSQL", error.code ?? error.name));
     }
+    schemaReady ??= prepareSchema().catch(error => {
+      schemaReady = undefined;
+      throw error;
+    });
+    await schemaReady;
     const route = req.method + " " + new URL(req.url).pathname;
     return json(await handle(req, ctx, route, Math.floor(Date.now()/1000)));
   } catch (error) {
