@@ -19,15 +19,16 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
       - name: Compilar y firmar APK
         shell: bash
         run: |
           set -euo pipefail
-          sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
           sdk="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           tools="$sdk/build-tools/35.0.0"
           platform="$sdk/platforms/android-35/android.jar"
+          if [[ ! -f "$platform" || ! -x "$tools/aapt2" ]]; then
+            "$sdk/cmdline-tools/latest/bin/sdkmanager" 'platforms;android-35' 'build-tools;35.0.0'
+          fi
           work="$RUNNER_TEMP/apk-build"
           mkdir -p "$work/classes" "$work/dex" dist
           mapfile -t sources < <(find android/src -name '*.java')

@@ -11,7 +11,7 @@ if (!process.env.DATABASE_URL || !validName(name) || process.stdin.isTTY) {
 }
 const password = (await text(process.stdin)).replace(/\r?\n$/, "");
 if (!validPassword(password)) throw new Error("Contraseña de 8 a 128 caracteres.");
-const db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1 });
+const db = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 1, enableChannelBinding: true });
 try {
   await db.query(await readFile(new URL("./schema.sql", import.meta.url), "utf8"));
   const salt = randomBytes(16);
