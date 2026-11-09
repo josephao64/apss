@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: tiempo-en-pantalla
+    runtime: docker
+    plan: starter
+    branch: main
+    rootDir: servidor
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    disk:
+      name: pantalla-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: SCREEN_DB
+        value: /var/data/pantalla.sqlite3

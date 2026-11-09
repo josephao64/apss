@@ -1,0 +1,27 @@
+services:
+  api:
+    image: python:3.13-slim
+    working_dir: /app
+    command: python -u server.py
+    restart: unless-stopped
+    environment:
+      SCREEN_BIND: 0.0.0.0
+      SCREEN_TRUST_CADDY: "1"
+      SCREEN_DB: /data/pantalla.sqlite3
+    volumes:
+      - ./server.py:/app/server.py:ro
+      - usage_data:/data
+  https:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      SCREEN_DOMAIN: ${SCREEN_DOMAIN:?Configura SCREEN_DOMAIN en .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - https_data:/data
+volumes:
+  usage_data:
+  https_data:

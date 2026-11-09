@@ -1,0 +1,6 @@
+.env
+*.sqlite3
+*.sqlite3-*
+*.p12
+*.jks
+__pycache__/

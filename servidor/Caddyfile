@@ -1,0 +1,5 @@
+{$SCREEN_DOMAIN} {
+    reverse_proxy api:8080 {
+        header_up X-Client-IP {remote_host}
+    }
+}
