@@ -2,6 +2,26 @@
 
 El repositorio incluye el APK firmado, el código Android y el servidor para cuentas, amistades y estadísticas compartidas.
 
+## Desplegar en Netlify
+
+Netlify Functions usa PostgreSQL persistente para las cuentas, amistades y estadísticas. El APK 2.0 usa las mismas rutas y se puede conectar a cualquiera de los dos servidores. Una base PostgreSQL nueva empieza vacía.
+
+1. Crea una base PostgreSQL y obtén su URL de conexión TLS. Usa una URL que pueda conectarse desde Netlify y desde el equipo donde ejecutarás la configuración. Si tu proveedor ofrece una URL con pool, puedes usarla en Netlify. Sigue la configuración TLS de tu proveedor.
+2. Desde un terminal Bash con Node.js, clona este repositorio, abre su carpeta y ejecuta lo siguiente. La contraseña y la URL se solicitan sin mostrarse en pantalla.
+
+   ```bash
+   npm ci
+   read -rsp 'URL de PostgreSQL: ' DATABASE_URL; echo
+   export DATABASE_URL
+   read -rsp 'Contraseña del administrador: ' ADMIN_PASSWORD; echo
+   printf '%s' "$ADMIN_PASSWORD" | npm run setup -- tu_usuario
+   unset ADMIN_PASSWORD DATABASE_URL
+   ```
+
+3. En Netlify elige **Add new project → Import an existing project**, conecta el repositorio y selecciona `main`. El archivo `netlify.toml` define el directorio público y el de funciones.
+4. Configura `DATABASE_URL` como variable de entorno de producción disponible para las funciones. Guárdala como secreto en el panel. Publica o vuelve a desplegar si el primer despliegue ya se ejecutó.
+5. Comprueba que `https://TU-SITIO.netlify.app/health` devuelva `{"ok":true}`. La URL base HTTPS se ingresa en **Cuenta y amigos**. El dominio debe ser accesible para los teléfonos. Las rutas privadas se protegen con la cuenta de la app.
+
 ## Desplegar en Render
 
 1. Desde tu cuenta de Render, crea un Blueprint con el repositorio `josephao64/apss` y la rama `main`.

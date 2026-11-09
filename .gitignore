@@ -4,3 +4,6 @@
 *.p12
 *.jks
 __pycache__/
+
+node_modules/
+.netlify/

@@ -1,0 +1,11 @@
+{
+  "name": "tiempo-en-pantalla",
+  "version": "1.0.0",
+  "scripts": {
+    "setup": "node netlify/setup.mjs"
+  },
+  "type": "commonjs",
+  "dependencies": {
+    "pg": "8.23.1"
+  }
+}
